@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Porting guide
+    url: https://github.com/thedankest/droidlift/blob/main/docs/porting.md
+    about: From an APK to a playable build, step by step.
+  - name: Limits
+    url: https://github.com/thedankest/droidlift/blob/main/docs/limits.md
+    about: Check here first whether your game is a fit.

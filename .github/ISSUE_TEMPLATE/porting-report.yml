@@ -1,0 +1,44 @@
+name: Porting report
+description: You tried droidlift on a game. Tell us how far it got, whether it worked or not.
+labels: [porting-report]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Reports on games that *didn't* work are just as useful: they show where droidlift needs to grow.
+        **No game data, please**: no binaries, assets or decompiled code, and no links to where APKs are hosted.
+  - type: input
+    id: game
+    attributes:
+      label: Game and engine
+      description: Name, version, and the engine if you know it (custom C++, cocos2d-x, Unity...).
+    validations:
+      required: true
+  - type: dropdown
+    id: reached
+    attributes:
+      label: How far it got
+      options:
+        - "--check fails: imports missing"
+        - Loads, but faults during start-up
+        - Renders, but something is wrong
+        - Playable on the Mac
+        - Playable on the iPhone
+    validations:
+      required: true
+  - type: textarea
+    id: imports
+    attributes:
+      label: Missing imports
+      description: What `--check` reported (names only).
+      render: text
+  - type: textarea
+    id: jni
+    attributes:
+      label: Java side
+      description: Roughly how many Java methods the native code calls, and anything unusual (reflection, Views, NativeActivity).
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: Backends that work or fail, performance, workarounds you needed.

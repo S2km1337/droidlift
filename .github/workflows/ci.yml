@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    name: Build the template port (no game)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: droidlift
+
+      - name: Tools
+        run: brew install sdl3 boost ninja
+
+      - name: Scripts parse
+        run: for f in droidlift/scripts/*.sh droidlift/scripts/lib/*.sh droidlift/ios/*.sh droidlift/ios/tests/*.sh; do zsh -n "$f"; done
+
+      - name: Make a port from the template
+        run: |
+          cp -R droidlift/examples/template port
+          ln -s "$GITHUB_WORKSPACE/droidlift" port/droidlift
+
+      - name: Fetch dynarmic (pinned)
+        working-directory: port
+        run: droidlift/scripts/fetch-deps.sh
+
+      - name: Configure
+        working-directory: port
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DDL_RECOMP=OFF
+
+      - name: Build
+        working-directory: port
+        run: cmake --build build
+
+      - name: Smoke
+        working-directory: port
+        run: |
+          build/my-game --help > /dev/null
+          test -x build/droidlift/recomp/droidlift-recomp
+
+      - name: Device-picker test
+        working-directory: droidlift
+        run: ios/tests/find-device-test.sh | tee /dev/stderr | grep -q "FIND DEVICE OK"

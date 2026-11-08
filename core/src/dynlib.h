@@ -1,5 +1,5 @@
 /*
- * Host-provided imports: every symbol the three libraries import from Android
+ * Host-provided imports: every symbol a game's libraries import from Android
  * system libraries (libc, libm, GLES, ...) must be named here, modelled on
  * leos-fortune-vita's default_dynlib[] table.
  *

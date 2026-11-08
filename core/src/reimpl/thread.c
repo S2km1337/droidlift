@@ -8,7 +8,7 @@
  * thread-specific data. The pthread_t handed to the guest is the guest
  * address of a small block, as bionic's is a pointer to its thread struct.
  *
- * Nothing in the three libraries reads TPIDRURO directly (no
+ * Nothing in the libraries ported so far reads TPIDRURO directly (no
  * mrc p15,0,rX,c13,c0,3), so no guest TLS block is set up.
  */
 #include <pthread.h>

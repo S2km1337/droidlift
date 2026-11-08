@@ -1,0 +1,40 @@
+name: Bug
+description: Something in droidlift is wrong (a shim, a backend, the build, the iOS scripts).
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **No game data, please.** Don't attach or link binaries, assets or decompiled game code. Offsets, symbol names and log lines are fine.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, what you got.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: The relevant part of the loader's output. DL_TRACE_IMPORTS=1, DL_TRACE_FILES=1 or DL_TRACE_INIT=1 often help.
+      render: text
+  - type: dropdown
+    id: backend
+    attributes:
+      label: CPU backend
+      multiple: true
+      options: [dynarmic, interp, recomp, not CPU-related]
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      multiple: true
+      options: [macOS, iOS Simulator, iPhone]
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: droidlift commit, macOS and Xcode versions (and iOS for a device).
+    validations:
+      required: true
