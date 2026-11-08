@@ -1,0 +1,11 @@
+# The game and everything derived from it stays out of git.
+/original
+/extracted
+/build*
+/generated*
+*.nosync
+*.ipa
+/third_party
+# The iPhone build's team and bundle id (droidlift/ios/device-config.sh).
+/device.local.env
+.DS_Store

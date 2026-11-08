@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 400" width="1280" height="400" role="img" aria-labelledby="t d">
+  <title id="t">droidlift</title>
+  <desc id="d">droidlift: native Android games on macOS and iPhone. CPU backends: dynarmic, an ARMv7 interpreter, and an ahead-of-time ARMv7 to C recompiler.</desc>
+  <rect width="1280" height="400" fill="#000000"/>
+  <g font-family="'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, Consolas, 'DejaVu Sans Mono', 'Courier New', monospace">
+  <rect x="19" y="19" width="1242" height="362" fill="#141414" stroke="#F4F1E8" stroke-width="6"/>
+  <rect x="16" y="16" width="1248" height="50" fill="#F4F1E8"/>
+<text x="42" y="49" font-size="20" font-weight="700" fill="#141414" text-anchor="start" letter-spacing="0">DROIDLIFT.SYS :: ARMEABI-V7A -&gt; ARM64</text>
+<text x="1238" y="49" font-size="20" font-weight="700" fill="#141414" text-anchor="end" letter-spacing="0">[_] [#] [X]</text>
+<text x="66" y="192" font-size="118" font-weight="700" fill="#FFD400" text-anchor="start" letter-spacing="-4">droidlift</text>
+<text x="58" y="184" font-size="118" font-weight="700" fill="#F4F1E8" text-anchor="start" letter-spacing="-4">droidlift</text>
+<text x="62" y="244" font-size="27" font-weight="700" fill="#F4F1E8" text-anchor="start" letter-spacing="0">NATIVE ANDROID GAMES ON MACOS + IPHONE</text>
+  <rect x="68.0" y="274" width="145.6" height="44" fill="#F4F1E8"/>
+  <rect x="62.0" y="268" width="145.6" height="44" fill="#141414" stroke="#F4F1E8" stroke-width="4"/>
+<text x="134.8" y="297" font-size="21" font-weight="700" fill="#F4F1E8" text-anchor="middle" letter-spacing="0">DYNARMIC</text>
+  <rect x="235.6" y="274" width="185.2" height="44" fill="#F4F1E8"/>
+  <rect x="229.6" y="268" width="185.2" height="44" fill="#141414" stroke="#F4F1E8" stroke-width="4"/>
+<text x="322.2" y="297" font-size="21" font-weight="700" fill="#F4F1E8" text-anchor="middle" letter-spacing="0">INTERPRETER</text>
+  <rect x="442.8" y="274" width="264.4" height="44" fill="#F4F1E8"/>
+  <rect x="436.8" y="268" width="264.4" height="44" fill="#FFD400" stroke="#F4F1E8" stroke-width="4"/>
+<text x="569.0" y="297" font-size="21" font-weight="700" fill="#111111" text-anchor="middle" letter-spacing="0">ARMV7 -&gt; C RECOMP</text>
+  <line x1="19" y1="338" x2="1261" y2="338" stroke="#F4F1E8" stroke-width="4"/>
+<text x="42" y="368" font-size="20" font-weight="700" fill="#CFCABC" text-anchor="start" letter-spacing="0">$ droidlift --apk game.apk --cpu recomp --window_</text>
+  <rect x="962" y="98" width="276" height="228" fill="#F4F1E8"/>
+  <rect x="950" y="86" width="276" height="228" fill="#FFD400" stroke="#F4F1E8" stroke-width="6"/>
+<g fill="#111111" font-size="25" font-weight="700" text-anchor="middle">
+    <text x="1081.0" y="115.0">/</text>
+    <text x="1095.0" y="115.0">\</text>
+    <text x="1067.0" y="135.0">/</text>
+    <text x="1109.0" y="135.0">\</text>
+    <text x="1053.0" y="155.0">/</text>
+    <text x="1067.0" y="155.0">_</text>
+    <text x="1109.0" y="155.0">_</text>
+    <text x="1123.0" y="155.0">\</text>
+    <text x="1081.0" y="175.0">|</text>
+    <text x="1095.0" y="175.0">|</text>
+    <text x="1011.0" y="195.0">+</text>
+    <text x="1025.0" y="195.0">-</text>
+    <text x="1039.0" y="195.0">-</text>
+    <text x="1053.0" y="195.0">-</text>
+    <text x="1067.0" y="195.0">-</text>
+    <text x="1081.0" y="195.0">|</text>
+    <text x="1095.0" y="195.0">|</text>
+    <text x="1109.0" y="195.0">-</text>
+    <text x="1123.0" y="195.0">-</text>
+    <text x="1137.0" y="195.0">-</text>
+    <text x="1151.0" y="195.0">-</text>
+    <text x="1165.0" y="195.0">+</text>
+    <text x="983.0" y="215.0">-</text>
+    <text x="997.0" y="215.0">-</text>
+    <text x="1011.0" y="215.0">|</text>
+    <text x="1081.0" y="215.0">|</text>
+    <text x="1095.0" y="215.0">|</text>
+    <text x="1165.0" y="215.0">|</text>
+    <text x="1179.0" y="215.0">-</text>
+    <text x="1193.0" y="215.0">-</text>
+    <text x="983.0" y="235.0">-</text>
+    <text x="997.0" y="235.0">-</text>
+    <text x="1011.0" y="235.0">|</text>
+    <text x="1081.0" y="235.0">&#39;</text>
+    <text x="1095.0" y="235.0">&#39;</text>
+    <text x="1165.0" y="235.0">|</text>
+    <text x="1179.0" y="235.0">-</text>
+    <text x="1193.0" y="235.0">-</text>
+    <text x="983.0" y="255.0">-</text>
+    <text x="997.0" y="255.0">-</text>
+    <text x="1011.0" y="255.0">|</text>
+    <text x="1165.0" y="255.0">|</text>
+    <text x="1179.0" y="255.0">-</text>
+    <text x="1193.0" y="255.0">-</text>
+    <text x="1011.0" y="275.0">+</text>
+    <text x="1025.0" y="275.0">-</text>
+    <text x="1039.0" y="275.0">-</text>
+    <text x="1053.0" y="275.0">-</text>
+    <text x="1067.0" y="275.0">-</text>
+    <text x="1081.0" y="275.0">-</text>
+    <text x="1095.0" y="275.0">-</text>
+    <text x="1109.0" y="275.0">-</text>
+    <text x="1123.0" y="275.0">-</text>
+    <text x="1137.0" y="275.0">-</text>
+    <text x="1151.0" y="275.0">-</text>
+    <text x="1165.0" y="275.0">+</text>
+    <text x="1053.0" y="295.0">|</text>
+    <text x="1123.0" y="295.0">|</text>
+    </g>
+  </g>
+</svg>

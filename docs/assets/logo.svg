@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-labelledby="t">
+  <title id="t">droidlift</title>
+  <rect width="512" height="512" fill="#E4DFD1"/>
+  <rect x="60" y="60" width="412" height="412" fill="#111111"/>
+  <rect x="40" y="40" width="412" height="412" fill="#FFD400" stroke="#111111" stroke-width="12"/>
+  <g font-family="'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, Consolas, 'DejaVu Sans Mono', 'Courier New', monospace">
+    <g fill="#111111" font-size="38" font-weight="700" text-anchor="middle">
+    <text x="235.0" y="94.0">/</text>
+    <text x="257.0" y="94.0">\</text>
+    <text x="213.0" y="130.0">/</text>
+    <text x="279.0" y="130.0">\</text>
+    <text x="191.0" y="166.0">/</text>
+    <text x="213.0" y="166.0">_</text>
+    <text x="279.0" y="166.0">_</text>
+    <text x="301.0" y="166.0">\</text>
+    <text x="235.0" y="202.0">|</text>
+    <text x="257.0" y="202.0">|</text>
+    <text x="125.0" y="238.0">+</text>
+    <text x="147.0" y="238.0">-</text>
+    <text x="169.0" y="238.0">-</text>
+    <text x="191.0" y="238.0">-</text>
+    <text x="213.0" y="238.0">-</text>
+    <text x="235.0" y="238.0">|</text>
+    <text x="257.0" y="238.0">|</text>
+    <text x="279.0" y="238.0">-</text>
+    <text x="301.0" y="238.0">-</text>
+    <text x="323.0" y="238.0">-</text>
+    <text x="345.0" y="238.0">-</text>
+    <text x="367.0" y="238.0">+</text>
+    <text x="81.0" y="274.0">-</text>
+    <text x="103.0" y="274.0">-</text>
+    <text x="125.0" y="274.0">|</text>
+    <text x="235.0" y="274.0">|</text>
+    <text x="257.0" y="274.0">|</text>
+    <text x="367.0" y="274.0">|</text>
+    <text x="389.0" y="274.0">-</text>
+    <text x="411.0" y="274.0">-</text>
+    <text x="81.0" y="310.0">-</text>
+    <text x="103.0" y="310.0">-</text>
+    <text x="125.0" y="310.0">|</text>
+    <text x="235.0" y="310.0">&#39;</text>
+    <text x="257.0" y="310.0">&#39;</text>
+    <text x="367.0" y="310.0">|</text>
+    <text x="389.0" y="310.0">-</text>
+    <text x="411.0" y="310.0">-</text>
+    <text x="81.0" y="346.0">-</text>
+    <text x="103.0" y="346.0">-</text>
+    <text x="125.0" y="346.0">|</text>
+    <text x="367.0" y="346.0">|</text>
+    <text x="389.0" y="346.0">-</text>
+    <text x="411.0" y="346.0">-</text>
+    <text x="125.0" y="382.0">+</text>
+    <text x="147.0" y="382.0">-</text>
+    <text x="169.0" y="382.0">-</text>
+    <text x="191.0" y="382.0">-</text>
+    <text x="213.0" y="382.0">-</text>
+    <text x="235.0" y="382.0">-</text>
+    <text x="257.0" y="382.0">-</text>
+    <text x="279.0" y="382.0">-</text>
+    <text x="301.0" y="382.0">-</text>
+    <text x="323.0" y="382.0">-</text>
+    <text x="345.0" y="382.0">-</text>
+    <text x="367.0" y="382.0">+</text>
+    <text x="191.0" y="418.0">|</text>
+    <text x="301.0" y="418.0">|</text>
+    </g>
+  </g>
+</svg>
