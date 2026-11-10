@@ -2,7 +2,9 @@
 #define APK_H
 
 /* Native libraries inside the APK, in the order Java's System.loadLibrary loads them. */
+#ifndef APK_LIB_DIR
 #define APK_LIB_DIR "lib/armeabi-v7a"
+#endif
 
 /* Unpacks the APK's native libraries into out_dir (a git-ignored directory)
  * with the system unzip. Dev-Mac only: the iOS build bundles pre-unpacked data. */

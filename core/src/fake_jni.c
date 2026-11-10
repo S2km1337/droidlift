@@ -308,6 +308,19 @@ uint32_t jni_new_object_array(const char *elem_cls, uint32_t len) {
   return array_new('L', elem_cls, len);
 }
 
+uint32_t jni_new_prim_array(char elem, uint32_t len) {
+  if (!strchr("ZBCSIJFD", elem) || !elem) return 0;
+  return array_new(elem, NULL, len);
+}
+
+void jni_free_prim_array(uint32_t array) {
+  jobj *a = array_get(array);
+  if (!a || a->elem == 'L' || !a->data) return;
+  guest_free(a->data);
+  a->data = 0;
+  a->len = 0;
+}
+
 int jni_set_object_array_element(uint32_t array, uint32_t index, uint32_t value) {
   jobj *a = array_get(array);
   if (!a || a->elem != 'L' || index >= a->len) return -1;
@@ -503,7 +516,7 @@ static uint64_t call_method(cpu *c, uint32_t self, uint32_t mid, int first, args
     unimplemented_calls++;
     return 0;
   }
-  jni_call call = {.self = self};
+  jni_call call = {.self = self, .cpu = c};
   arg_reader r = {c, mode, mode == ARGS_VARARGS ? (uint32_t)first : cpu_arg(c, first)};
   decode_args(m->sig, &r, &call);
   if (m->fn) return m->fn(&call);

@@ -26,6 +26,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/uio.h>
 #include <unistd.h>
 #include <utime.h>
 
@@ -80,9 +82,11 @@ static void ret_host(cpu *c, long r) {
   cpu_ret(c, (uint32_t)r);
 }
 
-static int path_ok(const char *call, const char *path) {
-  if (stdio_path_allowed(path)) return 1;
-  fprintf(stderr, "[file] %s(\"%s\"): outside the data directory, ENOENT\n", call, path);
+/* Normalises *path (stdio_guest_path) and says whether the guest may use it. */
+static int path_ok(const char *call, const char **path) {
+  *path = stdio_guest_path(*path);
+  if (stdio_path_allowed(*path)) return 1;
+  fprintf(stderr, "[file] %s(\"%s\"): outside the data directory, ENOENT\n", call, *path);
   return 0;
 }
 
@@ -161,7 +165,7 @@ static void h_open(cpu *c) {
       return;
     }
   }
-  if (is_random ? (flags & L_O_ACCMODE) != 0 : !path_ok("open", path)) {
+  if (is_random ? (flags & L_O_ACCMODE) != 0 : !path_ok("open", &path)) {
     fail(c, 2 /* ENOENT */);
     return;
   }
@@ -302,7 +306,7 @@ static void stat_to_guest(uint32_t g, const struct stat *st) {
 static void h_stat(cpu *c) {
   const char *path = g2h(cpu_arg(c, 0));
   struct stat st;
-  if (!path_ok("stat", path)) {
+  if (!path_ok("stat", &path)) {
     fail(c, 2);
     return;
   }
@@ -368,7 +372,7 @@ static void h_fcntl(cpu *c) {
 
 static void h_access(cpu *c) {
   const char *path = g2h(cpu_arg(c, 0));
-  if (!path_ok("access", path)) {
+  if (!path_ok("access", &path)) {
     fail(c, 2);
     return;
   }
@@ -377,7 +381,7 @@ static void h_access(cpu *c) {
 
 static void h_mkdir(cpu *c) {
   const char *path = g2h(cpu_arg(c, 0));
-  if (!path_ok("mkdir", path)) {
+  if (!path_ok("mkdir", &path)) {
     fail(c, 13 /* EACCES */);
     return;
   }
@@ -386,7 +390,7 @@ static void h_mkdir(cpu *c) {
 
 static void h_rmdir(cpu *c) {
   const char *path = g2h(cpu_arg(c, 0));
-  if (!path_ok("rmdir", path)) {
+  if (!path_ok("rmdir", &path)) {
     fail(c, 2);
     return;
   }
@@ -395,7 +399,7 @@ static void h_rmdir(cpu *c) {
 
 static void h_unlink(cpu *c) {
   const char *path = g2h(cpu_arg(c, 0));
-  if (!path_ok("unlink", path)) {
+  if (!path_ok("unlink", &path)) {
     fail(c, 2);
     return;
   }
@@ -404,7 +408,7 @@ static void h_unlink(cpu *c) {
 
 static void h_rename(cpu *c) {
   const char *from = g2h(cpu_arg(c, 0)), *to = g2h(cpu_arg(c, 1));
-  if (!path_ok("rename", from) || !path_ok("rename", to)) {
+  if (!path_ok("rename", &from) || !path_ok("rename", &to)) {
     fail(c, 2);
     return;
   }
@@ -414,7 +418,7 @@ static void h_rename(cpu *c) {
 
 static void h_chmod(cpu *c) {
   const char *path = g2h(cpu_arg(c, 0));
-  if (!path_ok("chmod", path)) {
+  if (!path_ok("chmod", &path)) {
     fail(c, 2);
     return;
   }
@@ -424,7 +428,7 @@ static void h_chmod(cpu *c) {
 /* utime(path, const struct utimbuf *times): two 32-bit time_t, or NULL. */
 static void h_utime(cpu *c) {
   const char *path = g2h(cpu_arg(c, 0));
-  if (!path_ok("utime", path)) {
+  if (!path_ok("utime", &path)) {
     fail(c, 2);
     return;
   }
@@ -435,6 +439,129 @@ static void h_utime(cpu *c) {
     ub.modtime = (int32_t)gm_r32(t + 4);
   }
   ret_host(c, utime(path, t ? &ub : NULL));
+}
+
+/* utimes(path, const struct timeval tv[2]): 32-bit seconds and microseconds,
+ * or NULL for now. */
+static void h_utimes(cpu *c) {
+  const char *path = g2h(cpu_arg(c, 0));
+  if (!path_ok("utimes", &path)) {
+    fail(c, 2);
+    return;
+  }
+  uint32_t t = cpu_arg(c, 1);
+  struct timeval tv[2];
+  for (int i = 0; t && i < 2; i++) {
+    tv[i].tv_sec = (int32_t)gm_r32(t + 8 * (uint32_t)i);
+    tv[i].tv_usec = (int32_t)gm_r32(t + 8 * (uint32_t)i + 4);
+  }
+  ret_host(c, utimes(path, t ? tv : NULL));
+}
+
+/* remove(path): unlink, or rmdir for a directory. */
+static void h_remove(cpu *c) {
+  const char *path = g2h(cpu_arg(c, 0));
+  if (!path_ok("remove", &path)) {
+    fail(c, 2);
+    return;
+  }
+  ret_host(c, remove(path));
+}
+
+/* mkstemp(template): the template must name a file in the data directory.
+ * The host fills in a normalised copy; its trailing "XXXXXX" replacement is
+ * copied back into the guest's template. */
+static void h_mkstemp(cpu *c) {
+  char *tmpl = g2h(cpu_arg(c, 0));
+  const char *path = tmpl;
+  if (!path_ok("mkstemp", &path)) {
+    fail(c, 2);
+    return;
+  }
+  char copy[PATH_MAX];
+  snprintf(copy, sizeof copy, "%s", path);
+  int fd = mkstemp(copy);
+  size_t n = strlen(tmpl), m = strlen(copy);
+  if (fd >= 0 && n >= 6 && m >= 6) memcpy(tmpl + n - 6, copy + m - 6, 6);
+  ret_host(c, fd);
+}
+
+static void h_fsync(cpu *c) {
+  int fd = (int)cpu_arg(c, 0);
+  if (!host_fd_ok(fd)) {
+    fail(c, L_EBADF);
+    return;
+  }
+  ret_host(c, fsync(fd));
+}
+
+/* fchown(fd, uid, gid): the app owns its files already; nothing to change. */
+static void h_fchown(cpu *c) {
+  int fd = (int)cpu_arg(c, 0);
+  if (!host_fd_ok(fd)) {
+    fail(c, L_EBADF);
+    return;
+  }
+  cpu_ret(c, 0);
+}
+
+/* lseek64(fd, off64_t offset, whence): the 64-bit offset is 8-byte aligned,
+ * so it takes r2/r3 and whence goes on the stack; the result is r0/r1. */
+static void h_lseek64(cpu *c) {
+  int fd = (int)cpu_arg(c, 0);
+  if (!host_fd_ok(fd)) {
+    gm_w32(guest_errno_addr(), L_EBADF);
+    cpu_ret64(c, (uint64_t)-1);
+    return;
+  }
+  int64_t off = (int64_t)((uint64_t)cpu_arg(c, 2) | (uint64_t)cpu_arg(c, 3) << 32);
+  off_t r = lseek(fd, (off_t)off, (int)cpu_arg(c, 4));
+  if (r < 0) guest_set_errno(errno);
+  cpu_ret64(c, (uint64_t)(int64_t)r);
+}
+
+/* writev(fd, const struct iovec *iov, count): 8-byte guest iovecs. */
+static void h_writev(cpu *c) {
+  int fd = (int)cpu_arg(c, 0);
+  uint32_t iov = cpu_arg(c, 1), n = cpu_arg(c, 2);
+  if (n > 1024) {
+    fail(c, 22 /* EINVAL */);
+    return;
+  }
+  if (fd == 1 || fd == 2) {
+    long total = 0;
+    for (uint32_t i = 0; i < n; i++) {
+      uint32_t base = gm_r32(iov + 8 * i), len = gm_r32(iov + 8 * i + 4);
+      total += stdio_write(stdio_stream(fd), g2h(base), len);
+    }
+    cpu_ret(c, (uint32_t)total);
+    return;
+  }
+  if (!host_fd_ok(fd)) {
+    fail(c, L_EBADF);
+    return;
+  }
+  struct iovec hv[1024];
+  for (uint32_t i = 0; i < n; i++) {
+    hv[i].iov_base = g2h(gm_r32(iov + 8 * i));
+    hv[i].iov_len = gm_r32(iov + 8 * i + 4);
+  }
+  ret_host(c, writev(fd, hv, (int)n));
+}
+
+/* getcwd(buf, size): an app's working directory is "/" on Android. A NULL
+ * buf asks for a malloc'd copy, as bionic allows. */
+static void h_getcwd(cpu *c) {
+  uint32_t buf = cpu_arg(c, 0), size = cpu_arg(c, 1);
+  if (!buf) {
+    buf = guest_malloc(size > 2 ? size : 2);
+  } else if (size < 2) {
+    gm_w32(guest_errno_addr(), 34 /* ERANGE */);
+    cpu_ret(c, 0);
+    return;
+  }
+  strcpy(g2h(buf), "/");
+  cpu_ret(c, buf);
 }
 
 /* umask only shapes the modes mkdir passes on; the host umask is left alone. */
@@ -448,7 +575,7 @@ static void h_umask(cpu *c) {
 
 static void h_opendir(cpu *c) {
   const char *path = g2h(cpu_arg(c, 0));
-  if (!path_ok("opendir", path)) {
+  if (!path_ok("opendir", &path)) {
     gm_w32(guest_errno_addr(), 2);
     cpu_ret(c, 0);
     return;
@@ -547,5 +674,8 @@ const dynlib_impl reimpl_fileio[] = {
     {"readdir", h_readdir}, {"rename", h_rename},     {"rmdir", h_rmdir},
     {"setpriority", h_setpriority}, {"stat", h_stat}, {"syscall", h_syscall},
     {"umask", h_umask},     {"unlink", h_unlink},     {"utime", h_utime},
-    {"write", h_write},     {NULL, NULL},
+    {"write", h_write},     {"utimes", h_utimes},     {"remove", h_remove},
+    {"mkstemp", h_mkstemp}, {"fsync", h_fsync},       {"fchown", h_fchown},
+    {"lseek64", h_lseek64}, {"writev", h_writev},     {"getcwd", h_getcwd},
+    {NULL, NULL},
 };

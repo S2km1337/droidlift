@@ -258,7 +258,34 @@ static void h_vfprintf(cpu *c) {
   format_to_stream(c, cpu_arg(c, 0), cpu_arg(c, 1), va_list_args(c, cpu_arg(c, 2)));
 }
 
+/* --- liblog: the game's logcat lines, on stderr --- */
+
+static void log_line(uint32_t prio, uint32_t tag, const char *msg, size_t len) {
+  static const char lv[] = "??VDIWEFS";
+  char p = prio < sizeof lv - 1 ? lv[prio] : '?';
+  while (len && (msg[len - 1] == '\n' || msg[len - 1] == '\r')) len--;
+  fprintf(stderr, "[log %c/%s] %.*s\n", p, tag ? (const char *)g2h(tag) : "", (int)len, msg);
+}
+
+/* __android_log_print(int prio, const char *tag, const char *fmt, ...) */
+static void h_android_log_print(cpu *c) {
+  gargs a = variadic_args(c, 3);
+  char *s;
+  size_t len = guest_format(g2h(cpu_arg(c, 2)), &a, &s);
+  log_line(cpu_arg(c, 0), cpu_arg(c, 1), s, len);
+  free(s);
+  cpu_ret(c, (uint32_t)len);
+}
+
+/* __android_log_write(int prio, const char *tag, const char *text) */
+static void h_android_log_write(cpu *c) {
+  const char *s = cpu_arg(c, 2) ? (const char *)g2h(cpu_arg(c, 2)) : "";
+  log_line(cpu_arg(c, 0), cpu_arg(c, 1), s, strlen(s));
+  cpu_ret(c, (uint32_t)strlen(s));
+}
+
 const dynlib_impl reimpl_printf[] = {
+    {"__android_log_print", h_android_log_print}, {"__android_log_write", h_android_log_write},
     {"fprintf", h_fprintf},   {"printf", h_printf},     {"snprintf", h_snprintf}, {"sprintf", h_sprintf},
     {"vfprintf", h_vfprintf}, {"vsnprintf", h_vsnprintf}, {"vsprintf", h_vsprintf}, {NULL, NULL},
 };

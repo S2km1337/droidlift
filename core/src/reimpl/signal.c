@@ -66,7 +66,17 @@ static void h_sigprocmask(cpu *c) {
   cpu_ret(c, 0);
 }
 
+/* bsd_signal(sig, handler) (old bionic's signal()): accepted like sigaction;
+ * the previous handler reads as SIG_DFL. SIGPIPE, the usual one, is ignored
+ * by the host already (net.c). */
+static void h_bsd_signal(cpu *c) { cpu_ret(c, 0); }
+
+/* alarm(seconds): no SIGALRM is ever delivered (libcurl uses it only to cut a
+ * slow name lookup short); no earlier alarm was pending. */
+static void h_alarm(cpu *c) { cpu_ret(c, 0); }
+
 const dynlib_impl reimpl_signal[] = {
+    {"alarm", h_alarm},           {"bsd_signal", h_bsd_signal},
     {"longjmp", h_longjmp},       {"setjmp", h_setjmp},           {"sigaction", h_sigaction},
     {"siglongjmp", h_longjmp},    {"sigprocmask", h_sigprocmask}, {"sigsetjmp", h_sigsetjmp},
     {NULL, NULL},

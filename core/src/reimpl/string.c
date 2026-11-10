@@ -17,6 +17,8 @@
 #include "../guest_mem.h"
 #include "reimpl.h"
 
+#define PATH_MAX_G 4096 /* bionic's PATH_MAX */
+
 static const char *str(cpu *c, int i) { return g2h(cpu_arg(c, i)); }
 
 /* The guest address of host pointer p into argument i's string, or 0. */
@@ -152,7 +154,31 @@ static void h_toupper(cpu *c) {
   cpu_ret(c, ch < 0x80 ? (uint32_t)toupper((int)ch) : ch);
 }
 
+/* basename(path): bionic's, which doesn't modify path and returns a
+ * thread-local buffer. */
+static void h_basename(cpu *c) {
+  static __thread uint32_t buf;
+  if (!buf) buf = guest_malloc(PATH_MAX_G);
+  const char *p = cpu_arg(c, 0) ? (const char *)g2h(cpu_arg(c, 0)) : "";
+  char *out = g2h(buf);
+  size_t n = strlen(p);
+  while (n > 1 && p[n - 1] == '/') n--; /* trailing slashes */
+  if (n == 0) {
+    strcpy(out, ".");
+  } else {
+    size_t s = n;
+    while (s > 0 && p[s - 1] != '/') s--;
+    size_t len = n - s;
+    if (len == 0) len = 1, s = n - 1; /* "/" */
+    if (len >= PATH_MAX_G) len = PATH_MAX_G - 1;
+    memcpy(out, p + s, len);
+    out[len] = 0;
+  }
+  cpu_ret(c, buf);
+}
+
 const dynlib_impl reimpl_string[] = {
+    {"basename", h_basename},
     {"atoi", h_atoi},           {"atol", h_atoi},
     {"atoll", h_atoll},         {"strcasecmp", h_strcasecmp},
     {"strcat", h_strcat},       {"strchr", h_strchr},

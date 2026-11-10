@@ -27,6 +27,10 @@ void gm_free(void);
 /* Commits a zeroed region and returns its guest address, or 0 on failure. */
 uint32_t gm_alloc(uint32_t size, uint32_t align, const char *tag);
 
+/* Commits a zeroed region covering [addr, addr+size) at that address (rounded
+ * out to host pages), for fixed guest addresses such as the kernel's helper
+ * page. It must lie above everything gm_alloc may hand out. Returns addr, or 0. */
+uint32_t gm_map_fixed(uint32_t addr, uint32_t size, const char *tag);
 /* Name of the region that contains addr, or NULL. */
 const char *gm_region_tag(uint32_t addr);
 

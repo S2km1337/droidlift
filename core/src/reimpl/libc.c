@@ -58,6 +58,10 @@ int libc_init_data(void) {
   gm_w32(dynlib_find("_ctype_")->addr, ct);
   gm_w32(dynlib_find("_tolower_tab_")->addr, lo);
   gm_w32(dynlib_find("_toupper_tab_")->addr, up);
+  /* Older bionic exports the page size as data (getpagesize reads it). */
+  gm_w32(dynlib_find("__page_size")->addr, GUEST_PAGE);
+  /* getopt's state: optind starts at 1. */
+  gm_w32(dynlib_find("optind")->addr, 1);
   return 0;
 }
 
@@ -225,7 +229,38 @@ static void h_qsort(cpu *c) {
   }
 }
 
+/* bsearch(key, base, n, size, int (*cmp)(const void *key, const void *elem)) */
+static void h_bsearch(cpu *c) {
+  uint32_t key = cpu_arg(c, 0), base = cpu_arg(c, 1), n = cpu_arg(c, 2), size = cpu_arg(c, 3);
+  uint32_t cmp = cpu_arg(c, 4);
+  uint32_t lo = 0, hi = n;
+  while (lo < hi) {
+    uint32_t mid = lo + (hi - lo) / 2;
+    uint32_t args[2] = {key, base + mid * size};
+    int32_t r = (int32_t)cpu_callback(c, cmp, 2, args);
+    if (c->faulted) return;
+    if (r == 0) {
+      cpu_ret(c, base + mid * size);
+      return;
+    }
+    if (r < 0) hi = mid;
+    else lo = mid + 1;
+  }
+  cpu_ret(c, 0);
+}
+
+/* uname(struct utsname *): Linux's six 65-byte fields, as an ARMv7 phone. */
+static void h_uname(cpu *c) {
+  static const char *const f[6] = {"Linux", "localhost", "3.4.0", "#1 SMP PREEMPT", "armv7l",
+                                   "localdomain"};
+  uint8_t *u = g2h(cpu_arg(c, 0));
+  memset(u, 0, 6 * 65);
+  for (int i = 0; i < 6; i++) strncpy((char *)u + 65 * i, f[i], 64);
+  cpu_ret(c, 0);
+}
+
 const dynlib_impl reimpl_libc[] = {
+    {"bsearch", h_bsearch}, {"uname", h_uname},
     {"btowc", h_btowc},     {"getauxval", h_getauxval}, {"getenv", h_getenv},   {"iswctype", h_iswctype},
     {"qsort", h_qsort},
     {"strtol", h_strtol},   {"strtoll", h_strtoll}, {"strtoul", h_strtoul},

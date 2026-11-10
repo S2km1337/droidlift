@@ -118,6 +118,26 @@ typedef long GLintptr, GLsizeiptr;
   X(void, glVertexAttribPointer, (GLuint, GLint, GLenum, GLboolean, GLsizei, const void *)) \
   X(void, glViewport, (GLint, GLint, GLsizei, GLsizei))                                    \
   X(void, glScissor, (GLint, GLint, GLsizei, GLsizei))                                     \
+  X(void, glBindRenderbuffer, (GLenum, GLuint))                                            \
+  X(void, glBlendEquation, (GLenum))                                                       \
+  X(void, glBlendFunc, (GLenum, GLenum))                                                   \
+  X(void, glClearStencil, (GLint))                                                         \
+  X(void, glDeleteRenderbuffers, (GLsizei, const GLuint *))                                \
+  X(void, glFramebufferRenderbuffer, (GLenum, GLenum, GLenum, GLuint))                     \
+  X(void, glGenRenderbuffers, (GLsizei, GLuint *))                                         \
+  X(void, glGenerateMipmap, (GLenum))                                                      \
+  X(void, glGetBooleanv, (GLenum, GLboolean *))                                            \
+  X(void, glGetFloatv, (GLenum, GLfloat *))                                                \
+  X(void, glGetShaderSource, (GLuint, GLsizei, GLsizei *, char *))                         \
+  X(GLboolean, glIsEnabled, (GLenum))                                                      \
+  X(void, glPixelStorei, (GLenum, GLint))                                                  \
+  X(void, glRenderbufferStorage, (GLenum, GLenum, GLsizei, GLsizei))                       \
+  X(void, glStencilFunc, (GLenum, GLint, GLuint))                                          \
+  X(void, glStencilOp, (GLenum, GLenum, GLenum))                                           \
+  X(void, glUniform1f, (GLint, GLfloat))                                                   \
+  X(void, glUniform2f, (GLint, GLfloat, GLfloat))                                          \
+  X(void, glUniform3f, (GLint, GLfloat, GLfloat, GLfloat))                                 \
+  X(void, glUniform4f, (GLint, GLfloat, GLfloat, GLfloat, GLfloat))                        \
   /* extensions the game fetches with eglGetProcAddress */                                 \
   X(void, glGenVertexArraysOES, (GLsizei, GLuint *))                                       \
   X(void, glBindVertexArrayOES, (GLuint))                                                  \
@@ -174,25 +194,69 @@ int gles_bind(void) {
 static void *gptr(uint32_t a) { return a ? g2h(a) : NULL; }
 
 #define GL_SCISSOR_TEST 0x0C11
+#define GL_SCISSOR_BOX 0x0C10
 #define GL_VIEWPORT 0x0BA2
 #define GL_COLOR_BUFFER_BIT 0x4000
+#define GL_FRAMEBUFFER 0x8D40
 
-/* The game's rectangle of the surface (gles_set_content); unset: all of it. */
+/* The game's rectangle of the surface (gles_set_content); unset: all of it.
+ *
+ * While it is set, the game's view of the default framebuffer is that
+ * rectangle: its viewport and scissor box are kept here in its own
+ * coordinates and applied shifted by (x, y), and the scissor test stays on
+ * to clip to the rectangle (intersected with the game's own box when the game
+ * has the test on). With one of the game's framebuffer objects bound (a
+ * render-to-texture pass), its state goes to GL unchanged. */
 static struct {
   int on;
   GLint x, y;
   GLsizei w, h;
   GLfloat clear[4]; /* the game's clear colour, restored after the bars */
+  GLuint fbo;       /* the game's bound framebuffer; 0 is the surface */
+  GLint vp[4];      /* the game's viewport */
+  GLint sc[4];      /* the game's scissor box */
+  int sc_on;        /* the game's GL_SCISSOR_TEST */
 } content;
+
+static int content_active(void) { return content.on && content.fbo == 0; }
+
+static void apply_viewport(void) {
+  GLint dx = content_active() ? content.x : 0, dy = content_active() ? content.y : 0;
+  gl.glViewport(content.vp[0] + dx, content.vp[1] + dy, content.vp[2], content.vp[3]);
+}
+
+static void apply_scissor(void) {
+  if (!content_active()) {
+    gl.glScissor(content.sc[0], content.sc[1], content.sc[2], content.sc[3]);
+    if (content.sc_on)
+      gl.glEnable(GL_SCISSOR_TEST);
+    else
+      gl.glDisable(GL_SCISSOR_TEST);
+    return;
+  }
+  GLint x0 = content.x, y0 = content.y;
+  GLint x1 = content.x + content.w, y1 = content.y + content.h;
+  if (content.sc_on) {
+    GLint gx0 = content.sc[0] + content.x, gy0 = content.sc[1] + content.y;
+    GLint gx1 = gx0 + content.sc[2], gy1 = gy0 + content.sc[3];
+    if (gx0 > x0) x0 = gx0;
+    if (gy0 > y0) y0 = gy0;
+    if (gx1 < x1) x1 = gx1;
+    if (gy1 < y1) y1 = gy1;
+  }
+  gl.glScissor(x0, y0, x1 > x0 ? x1 - x0 : 0, y1 > y0 ? y1 - y0 : 0);
+  gl.glEnable(GL_SCISSOR_TEST);
+}
 
 void gles_set_content(int x, int y, int w, int h) {
   content.on = 1;
   content.x = x, content.y = y, content.w = w, content.h = h;
   /* The game never sets a viewport: it relies on the initial one, the whole
-   * surface on Android. */
-  gl.glViewport(x, y, w, h);
-  gl.glScissor(x, y, w, h);
-  gl.glEnable(GL_SCISSOR_TEST);
+   * surface on Android. The initial scissor box is the same. */
+  content.vp[0] = content.vp[1] = 0, content.vp[2] = w, content.vp[3] = h;
+  content.sc[0] = content.sc[1] = 0, content.sc[2] = w, content.sc[3] = h;
+  apply_viewport();
+  apply_scissor();
 }
 
 int gles_viewport_in_content(void) {
@@ -203,12 +267,12 @@ int gles_viewport_in_content(void) {
 }
 
 void gles_begin_frame(void) {
-  if (!content.on) return;
+  if (!content_active()) return;
   gl.glDisable(GL_SCISSOR_TEST);
   gl.glClearColor(0, 0, 0, 1);
   gl.glClear(GL_COLOR_BUFFER_BIT);
   gl.glClearColor(content.clear[0], content.clear[1], content.clear[2], content.clear[3]);
-  gl.glEnable(GL_SCISSOR_TEST);
+  apply_scissor();
 }
 
 static GLfloat F(cpu *c, int i) {
@@ -330,7 +394,12 @@ static void h_glDeleteTextures(cpu *c) { gl.glDeleteTextures(I(0), P(1)); }
 static void h_glDepthFunc(cpu *c) { gl.glDepthFunc(A(0)); }
 static void h_glDepthMask(cpu *c) { gl.glDepthMask((GLboolean)A(0)); }
 static void h_glDisable(cpu *c) {
-  if (!(content.on && A(0) == GL_SCISSOR_TEST)) gl.glDisable(A(0));
+  if (content.on && A(0) == GL_SCISSOR_TEST) {
+    content.sc_on = 0;
+    apply_scissor();
+    return;
+  }
+  gl.glDisable(A(0));
 }
 static void h_glDisableVertexAttribArray(cpu *c) { gl.glDisableVertexAttribArray(A(0)); }
 static void h_glDrawArrays(cpu *c) { gl.glDrawArrays(A(0), I(1), I(2)); }
@@ -338,7 +407,12 @@ static void h_glDrawElements(cpu *c) {
   gl.glDrawElements(A(0), I(1), A(2), buffer_or_client(GL_ELEMENT_ARRAY_BUFFER_BINDING, A(3)));
 }
 static void h_glEnable(cpu *c) {
-  if (!(content.on && A(0) == GL_SCISSOR_TEST)) gl.glEnable(A(0));
+  if (content.on && A(0) == GL_SCISSOR_TEST) {
+    content.sc_on = 1;
+    apply_scissor();
+    return;
+  }
+  gl.glEnable(A(0));
 }
 static void h_glEnableVertexAttribArray(cpu *c) { gl.glEnableVertexAttribArray(A(0)); }
 static void h_glFinish(cpu *c) {
@@ -358,10 +432,69 @@ static void h_glGetError(cpu *c) {
   pending_error = 0;
   cpu_ret(c, err);
 }
+/* The game's own value of a state the black bars change, or 0 if pname isn't
+ * one (or there are no bars). Fills up to 4 ints. */
+static int content_state(GLenum pname, GLint out[4]) {
+  if (!content.on) return 0;
+  switch (pname) {
+  case GL_VIEWPORT: memcpy(out, content.vp, sizeof content.vp); return 4;
+  case GL_SCISSOR_BOX: memcpy(out, content.sc, sizeof content.sc); return 4;
+  case GL_SCISSOR_TEST: out[0] = content.sc_on; return 1;
+  default: return 0;
+  }
+}
+
 static void h_glGetIntegerv(cpu *c) {
-  GLint *v = P(1);
+  GLint *v = P(1), s[4];
+  int n = content_state(A(0), s);
+  if (n && v) {
+    memcpy(v, s, (size_t)n * sizeof *v);
+    return;
+  }
   gl.glGetIntegerv(A(0), v);
-  if (content.on && A(0) == GL_VIEWPORT && v) v[0] -= content.x, v[1] -= content.y;
+}
+static void h_glGetBooleanv(cpu *c) {
+  GLboolean *v = P(1);
+  GLint s[4];
+  int n = content_state(A(0), s);
+  if (n && v) {
+    for (int i = 0; i < n; i++) v[i] = s[i] != 0;
+    return;
+  }
+  gl.glGetBooleanv(A(0), v);
+}
+static void h_glGetFloatv(cpu *c) {
+  GLfloat *v = P(1);
+  GLint s[4];
+  int n = content_state(A(0), s);
+  if (n && v) {
+    for (int i = 0; i < n; i++) v[i] = (GLfloat)s[i];
+    return;
+  }
+  gl.glGetFloatv(A(0), v);
+}
+static void h_glIsEnabled(cpu *c) {
+  if (content.on && A(0) == GL_SCISSOR_TEST) {
+    cpu_ret(c, (uint32_t)content.sc_on);
+    return;
+  }
+  cpu_ret(c, gl.glIsEnabled(A(0)));
+}
+static void h_glScissor(cpu *c) {
+  if (!content.on) {
+    gl.glScissor(I(0), I(1), I(2), I(3));
+    return;
+  }
+  content.sc[0] = I(0), content.sc[1] = I(1), content.sc[2] = I(2), content.sc[3] = I(3);
+  apply_scissor();
+}
+static void h_glBindFramebuffer(cpu *c) {
+  gl.glBindFramebuffer(A(0), A(1));
+  if (!content.on || A(0) != GL_FRAMEBUFFER) return;
+  /* Moving between the surface and a texture changes the offset. */
+  content.fbo = A(1);
+  apply_viewport();
+  apply_scissor();
 }
 static void h_glGetProgramInfoLog(cpu *c) { gl.glGetProgramInfoLog(A(0), I(1), P(2), P(3)); }
 static void h_glGetProgramiv(cpu *c) { gl.glGetProgramiv(A(0), A(1), P(2)); }
@@ -395,7 +528,8 @@ static void h_glGetString(cpu *c) {
 static void h_glGetUniformLocation(cpu *c) { cpu_ret(c, (uint32_t)gl.glGetUniformLocation(A(0), P(1))); }
 static void h_glLinkProgram(cpu *c) { gl.glLinkProgram(A(0)); }
 static void h_glReadPixels(cpu *c) {
-  gl.glReadPixels(I(0) + content.x, I(1) + content.y, I(2), I(3), A(4), A(5), P(6));
+  GLint dx = content_active() ? content.x : 0, dy = content_active() ? content.y : 0;
+  gl.glReadPixels(I(0) + dx, I(1) + dy, I(2), I(3), A(4), A(5), P(6));
 }
 
 /* glShaderSource(shader, count, strings, lengths): strings is a guest array
@@ -433,7 +567,54 @@ static void h_glVertexAttribPointer(cpu *c) {
   gl.glVertexAttribPointer(A(0), I(1), A(2), (GLboolean)A(3), I(4),
                            buffer_or_client(GL_ARRAY_BUFFER_BINDING, A(5)));
 }
-static void h_glViewport(cpu *c) { gl.glViewport(I(0) + content.x, I(1) + content.y, I(2), I(3)); }
+static void h_glViewport(cpu *c) {
+  if (!content.on) {
+    gl.glViewport(I(0), I(1), I(2), I(3));
+    return;
+  }
+  content.vp[0] = I(0), content.vp[1] = I(1), content.vp[2] = I(2), content.vp[3] = I(3);
+  apply_viewport();
+}
+
+/* Plain forwards: framebuffer objects, blending, stencil, uniforms. */
+static void h_glBindRenderbuffer(cpu *c) { gl.glBindRenderbuffer(A(0), A(1)); }
+static void h_glBlendEquation(cpu *c) { gl.glBlendEquation(A(0)); }
+static void h_glBlendFunc(cpu *c) { gl.glBlendFunc(A(0), A(1)); }
+static void h_glCheckFramebufferStatus(cpu *c) { cpu_ret(c, gl.glCheckFramebufferStatus(A(0))); }
+static void h_glClearStencil(cpu *c) { gl.glClearStencil(I(0)); }
+static void h_glDeleteFramebuffers(cpu *c) {
+  /* Deleting the bound framebuffer reverts the binding to the surface. */
+  const GLuint *ids = P(1);
+  for (GLint i = 0; content.on && ids && i < I(0); i++)
+    if (ids[i] && ids[i] == content.fbo) {
+      content.fbo = 0;
+      gl.glDeleteFramebuffers(I(0), ids);
+      apply_viewport();
+      apply_scissor();
+      return;
+    }
+  gl.glDeleteFramebuffers(I(0), ids);
+}
+static void h_glDeleteRenderbuffers(cpu *c) { gl.glDeleteRenderbuffers(I(0), P(1)); }
+static void h_glFramebufferRenderbuffer(cpu *c) {
+  gl.glFramebufferRenderbuffer(A(0), A(1), A(2), A(3));
+}
+static void h_glFramebufferTexture2D(cpu *c) {
+  gl.glFramebufferTexture2D(A(0), A(1), A(2), A(3), I(4));
+}
+static void h_glGenFramebuffers(cpu *c) { gl.glGenFramebuffers(I(0), P(1)); }
+static void h_glGenRenderbuffers(cpu *c) { gl.glGenRenderbuffers(I(0), P(1)); }
+static void h_glGenerateMipmap(cpu *c) { gl.glGenerateMipmap(A(0)); }
+static void h_glGetShaderSource(cpu *c) { gl.glGetShaderSource(A(0), I(1), P(2), P(3)); }
+static void h_glPixelStorei(cpu *c) { gl.glPixelStorei(A(0), I(1)); }
+static void h_glRenderbufferStorage(cpu *c) { gl.glRenderbufferStorage(A(0), A(1), I(2), I(3)); }
+static void h_glStencilFunc(cpu *c) { gl.glStencilFunc(A(0), I(1), A(2)); }
+static void h_glStencilOp(cpu *c) { gl.glStencilOp(A(0), A(1), A(2)); }
+static void h_glUniform1f(cpu *c) { gl.glUniform1f(I(0), F(c, 1)); }
+static void h_glUniform2f(cpu *c) { gl.glUniform2f(I(0), F(c, 1), F(c, 2)); }
+static void h_glUniform3f(cpu *c) { gl.glUniform3f(I(0), F(c, 1), F(c, 2), F(c, 3)); }
+/* The fifth argument is on the guest stack (softfp: four core registers). */
+static void h_glUniform4f(cpu *c) { gl.glUniform4f(I(0), F(c, 1), F(c, 2), F(c, 3), F(c, 4)); }
 
 static void h_glGenVertexArraysOES(cpu *c) { gl.glGenVertexArraysOES(I(0), P(1)); }
 static void h_glBindVertexArrayOES(cpu *c) { gl.glBindVertexArrayOES(A(0)); }
@@ -495,6 +676,13 @@ const dynlib_impl reimpl_gles[] = {
     E(glTexImage2D), E(glTexParameterf), E(glTexParameteri), E(glUniform1fv), E(glUniform1i),
     E(glUniform2fv), E(glUniform3fv), E(glUniform4fv), E(glUniformMatrix3fv),
     E(glUniformMatrix4fv), E(glUseProgram), E(glVertexAttribPointer), E(glViewport),
+    E(glBindFramebuffer), E(glBindRenderbuffer), E(glBlendEquation), E(glBlendFunc),
+    E(glCheckFramebufferStatus), E(glClearStencil), E(glDeleteFramebuffers),
+    E(glDeleteRenderbuffers), E(glFramebufferRenderbuffer), E(glFramebufferTexture2D),
+    E(glGenFramebuffers), E(glGenRenderbuffers), E(glGenerateMipmap), E(glGetBooleanv),
+    E(glGetFloatv), E(glGetShaderSource), E(glIsEnabled), E(glPixelStorei),
+    E(glRenderbufferStorage), E(glScissor), E(glStencilFunc), E(glStencilOp), E(glUniform1f),
+    E(glUniform2f), E(glUniform3f), E(glUniform4f),
     E(eglGetProcAddress),
     {NULL, NULL},
 };

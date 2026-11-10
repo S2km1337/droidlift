@@ -86,14 +86,14 @@ macro(_dl_add_recomp target)
   if (NOT IOS)
     # The game's libraries straight from the APK, unpacked into the build tree.
     set(_apk_dir "${CMAKE_CURRENT_BINARY_DIR}/${target}-apk")
-    set(_lib_dir "${_apk_dir}/lib/armeabi-v7a")
+    set(_lib_dir "${_apk_dir}/${DL_APK_LIB_DIR}")
     set(_lib_files)
     set(_members)
     foreach(l IN LISTS G_RECOMP)
       string(REPLACE ":" ";" _parts "${l}")
       list(GET _parts 0 _lib)
       list(APPEND _lib_files "${_lib_dir}/${_lib}.so")
-      list(APPEND _members "lib/armeabi-v7a/${_lib}.so")
+      list(APPEND _members "${DL_APK_LIB_DIR}/${_lib}.so")
     endforeach()
     add_custom_command(OUTPUT ${_lib_files}
       COMMAND "${CMAKE_COMMAND}" -E make_directory "${_apk_dir}"

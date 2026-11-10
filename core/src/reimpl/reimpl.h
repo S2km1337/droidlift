@@ -19,6 +19,8 @@ int runtime_atexit_count(void);
 uint32_t guest_errno_addr(void);
 /* Sets the guest errno from a host errno value, translated to Linux numbers. */
 void guest_set_errno(int host_errno);
+/* A host errno value as Linux numbers it (EIO for one with no equivalent). */
+int linux_errno(int host_errno);
 
 /* pthread.c: mutexes, condition variables, semaphores, once, keys. */
 extern const dynlib_impl reimpl_pthread[];
@@ -80,6 +82,10 @@ extern const dynlib_impl reimpl_stdio[];
 void stdio_set_data_root(const char *dir);
 const char *stdio_data_root(void);
 int stdio_path_allowed(const char *path);
+/* A guest path as an absolute host one: relative paths are taken from the
+ * working directory, "/" as on Android, and repeated slashes and "./" are
+ * dropped. Returns a thread-local buffer (four in rotation). */
+const char *stdio_guest_path(const char *path);
 /* Guest address of __sF[i] (0 stdin, 1 stdout, 2 stderr). */
 uint32_t stdio_stream(int i);
 /* Writes to a guest FILE; returns len, or -1 on error. */
@@ -95,6 +101,8 @@ extern const dynlib_impl reimpl_time[];
 /* android_asset.c: AAssetManager over the unpacked APK assets/ directory. */
 extern const dynlib_impl reimpl_android_asset[];
 void android_asset_set_root(const char *dir);
+/* The unpacked assets/ directory (the APK's assets, on the host). */
+const char *android_asset_root(void);
 /* Log every AAssetManager_open (off by default: the engine probes each
  * texture as .pvr, .ktx, .png and most probes miss). DL_VERBOSE=1 also
  * turns it on. */
@@ -107,10 +115,14 @@ extern const dynlib_impl reimpl_fileio[];
  * path isn't one. */
 int fileio_open_virtual(const char *path);
 
-/* net.c: fake sockets that never connect, and lookups that find nothing. */
+/* net.c: real host sockets (guest socket fds are host fds), name lookup,
+ * select, and epoll emulated over poll. DL_NET=off runs offline instead:
+ * connects fail and lookups find nothing. */
 extern const dynlib_impl reimpl_net[];
+/* 1 for an fd that net.c emulates rather than the host providing it (an
+ * epoll instance): read, write and fstat don't apply to it. */
 int net_is_socket(int fd);
-/* Frees a fake socket; returns 0, or -1 with the guest errno set. */
+/* Closes such an fd; returns 0, or -1 with the guest errno set. */
 int net_close(int fd);
 
 /* opensles.c: dlopen/dlsym for libOpenSLES.so only, and a minimal OpenSL ES

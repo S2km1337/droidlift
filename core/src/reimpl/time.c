@@ -98,6 +98,46 @@ static void h_gmtime_r(cpu *c) {
   cpu_ret(c, cpu_arg(c, 1));
 }
 
+static void h_localtime_r(cpu *c) {
+  time_t t = (int32_t)gm_r32(cpu_arg(c, 0));
+  struct tm h;
+  localtime_r(&t, &h);
+  tm_to_guest(cpu_arg(c, 1), &h);
+  cpu_ret(c, cpu_arg(c, 1));
+}
+
+static void h_gmtime(cpu *c) {
+  static uint32_t tm_buf;
+  if (!tm_buf) tm_buf = guest_malloc(G_TM_SIZE);
+  time_t t = (int32_t)gm_r32(cpu_arg(c, 0));
+  struct tm h;
+  gmtime_r(&t, &h);
+  tm_to_guest(tm_buf, &h);
+  cpu_ret(c, tm_buf);
+}
+
+/* mktime(tm): local time; normalises the guest's struct in place. */
+static void h_mktime(cpu *c) {
+  struct tm t;
+  tm_from_guest(&t, cpu_arg(c, 0));
+  time_t r = mktime(&t);
+  if (r != (time_t)-1) tm_to_guest(cpu_arg(c, 0), &t);
+  cpu_ret(c, (uint32_t)(int32_t)r);
+}
+
+/* difftime(time_t t1, time_t t0): 32-bit arguments, a double result (softfp). */
+static void h_difftime(cpu *c) {
+  double d = (double)(int32_t)cpu_arg(c, 0) - (double)(int32_t)cpu_arg(c, 1);
+  uint64_t b;
+  memcpy(&b, &d, sizeof b);
+  cpu_ret64(c, b);
+}
+
+/* clock(): CPU time; CLOCKS_PER_SEC is 1000000 on both bionic and the host. */
+static void h_clock(cpu *c) { cpu_ret(c, (uint32_t)clock()); }
+
+static void h_sleep(cpu *c) { cpu_ret(c, sleep(cpu_arg(c, 0))); }
+
 /* strftime(buf, max, fmt, tm) in the C locale. */
 static void h_strftime(cpu *c) {
   struct tm t;
@@ -131,5 +171,7 @@ const dynlib_impl reimpl_time[] = {
     {"clock_gettime", h_clock_gettime}, {"gettimeofday", h_gettimeofday}, {"gmtime_r", h_gmtime_r},
     {"jrand48", h_jrand48},             {"localtime", h_localtime},       {"lrand48", h_lrand48},
     {"srand48", h_srand48},             {"strftime", h_strftime},         {"time", h_time},
-    {"usleep", h_usleep},               {NULL, NULL},
+    {"usleep", h_usleep},               {"localtime_r", h_localtime_r},   {"gmtime", h_gmtime},
+    {"mktime", h_mktime},               {"difftime", h_difftime},         {"clock", h_clock},
+    {"sleep", h_sleep},                 {NULL, NULL},
 };

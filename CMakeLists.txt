@@ -23,6 +23,9 @@ set(DL_ROOT "${CMAKE_CURRENT_SOURCE_DIR}" CACHE INTERNAL "droidlift's source dir
 # Third-party sources (scripts/fetch-deps.sh, scripts/fetch-angle.sh,
 # scripts/fetch-ios-deps.sh) go here; by default the port's third_party/.
 set(DL_THIRD_PARTY "${CMAKE_SOURCE_DIR}/third_party" CACHE PATH "Where the fetch scripts put dynarmic, ANGLE and SDL3")
+# The APK's native library directory. Older games ship lib/armeabi (ARMv5TE/v6
+# code, which the ARMv7 backends also run) instead of lib/armeabi-v7a.
+set(DL_APK_LIB_DIR "lib/armeabi-v7a" CACHE STRING "The APK's native library directory")
 
 # ---- CPU backends -------------------------------------------------------------
 # dynarmic is a JIT, which a stock iPhone does not allow, so the device build

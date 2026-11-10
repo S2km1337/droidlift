@@ -41,13 +41,16 @@ typedef struct gthread {
   uint32_t ret_sentinel, cpsr, fpscr;
   uint32_t start, arg, stack, stack_size;
   uint32_t retval;
-  int detached, joined;
+  int detached, joined, finished;
   struct gthread *next;
 } gthread;
 
 static gthread *threads;
 static pthread_mutex_t threads_lock = PTHREAD_MUTEX_INITIALIZER;
 static __thread uint32_t self_handle;
+/* pthread_exit: the value it passed, and that it was called (the cpu halts). */
+static __thread uint32_t exit_value;
+static __thread int exit_called;
 static int faults;
 static int live; /* guest threads whose start routine hasn't returned */
 
@@ -111,6 +114,7 @@ static void *thread_main(void *p) {
   c->ops->set_fpscr(c, t->fpscr);
 
   uint32_t r = cpu_call(c, t->start, 1, &t->arg);
+  if (exit_called) r = exit_value;
   if (c->faulted) {
     fprintf(stderr, "[thread] guest thread 0x%08x (start 0x%08x) faulted\n", t->handle, t->start);
     __atomic_fetch_add(&faults, 1, __ATOMIC_RELAXED);
@@ -123,6 +127,7 @@ static void *thread_main(void *p) {
 
   pthread_mutex_lock(&threads_lock);
   t->retval = r;
+  t->finished = 1;
   if (t->detached) reap(t);
   pthread_mutex_unlock(&threads_lock);
   return NULL;
@@ -233,6 +238,41 @@ static void h_join(cpu *c) {
   cpu_ret(c, 0);
 }
 
+/* pthread_detach(pthread_t thread) */
+static void h_detach(cpu *c) {
+  pthread_mutex_lock(&threads_lock);
+  gthread *t = find(cpu_arg(c, 0));
+  uint32_t err = !t ? G_ESRCH : t->detached || t->joined ? G_EINVAL : 0;
+  if (!err) {
+    t->detached = 1;
+    pthread_detach(t->host);
+    if (t->finished) reap(t); /* nobody will join it now */
+  }
+  pthread_mutex_unlock(&threads_lock);
+  cpu_ret(c, err);
+}
+
+/* pthread_exit(void *value): ends the calling guest thread. Its cpu halts,
+ * so the cpu_call in thread_main returns and the thread finishes as if its
+ * start routine had returned value. */
+static void h_exit(cpu *c) {
+  exit_value = cpu_arg(c, 0);
+  exit_called = 1;
+  if (!self_handle) fprintf(stderr, "[thread] pthread_exit on a thread droidlift didn't start\n");
+  c->ops->halt(c);
+}
+
+/* pthread_kill(thread, sig): no signals are delivered; signal 0 (the
+ * existence check) answers truthfully. */
+static void h_kill(cpu *c) {
+  uint32_t handle = cpu_arg(c, 0), sig = cpu_arg(c, 1);
+  pthread_mutex_lock(&threads_lock);
+  int found = find(handle) != NULL || handle == self_handle;
+  pthread_mutex_unlock(&threads_lock);
+  if (found && sig != 0) fprintf(stderr, "[thread] pthread_kill(signal %u) ignored\n", sig);
+  cpu_ret(c, found ? 0 : G_ESRCH);
+}
+
 static void h_self(cpu *c) {
   /* The main thread and other host-made threads get a handle on first use. */
   if (!self_handle) self_handle = guest_malloc(16);
@@ -251,5 +291,8 @@ const dynlib_impl reimpl_thread[] = {
     {"pthread_create", h_create},
     {"pthread_join", h_join},
     {"pthread_self", h_self},
+    {"pthread_detach", h_detach},
+    {"pthread_exit", h_exit},
+    {"pthread_kill", h_kill},
     {NULL, NULL},
 };

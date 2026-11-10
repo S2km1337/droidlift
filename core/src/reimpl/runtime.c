@@ -56,23 +56,56 @@ uint32_t guest_errno_addr(void) {
   return errno_addr;
 }
 
-void guest_set_errno(int host_errno) {
-  /* Linux and Darwin share errno numbers 1-34; map the common ones above. */
-  int e;
+int linux_errno(int host_errno) {
+  /* Linux and Darwin share errno numbers 1-34; map the common ones above,
+   * including the socket errors a game's network code tests for. */
   switch (host_errno) {
-  case EAGAIN: e = 11; break;
-  case ENAMETOOLONG: e = 36; break;
-  case ENOSYS: e = 38; break;
-  case ENOTEMPTY: e = 39; break;
-  case ELOOP: e = 40; break;
-  default: e = host_errno > 0 && host_errno <= 34 ? host_errno : 5 /* EIO */; break;
+  case EAGAIN: return 11;
+  case ENAMETOOLONG: return 36;
+  case ENOSYS: return 38;
+  case ENOTEMPTY: return 39;
+  case ELOOP: return 40;
+  case EDESTADDRREQ: return 89;
+  case ENOTSOCK: return 88;
+  case EMSGSIZE: return 90;
+  case EPROTOTYPE: return 91;
+  case ENOPROTOOPT: return 92;
+  case EPROTONOSUPPORT: return 93;
+  case EOPNOTSUPP: return 95;
+  case EAFNOSUPPORT: return 97;
+  case EADDRINUSE: return 98;
+  case EADDRNOTAVAIL: return 99;
+  case ENETDOWN: return 100;
+  case ENETUNREACH: return 101;
+  case ENETRESET: return 102;
+  case ECONNABORTED: return 103;
+  case ECONNRESET: return 104;
+  case ENOBUFS: return 105;
+  case EISCONN: return 106;
+  case ENOTCONN: return 107;
+  case ETIMEDOUT: return 110;
+  case ECONNREFUSED: return 111;
+  case EHOSTDOWN: return 112;
+  case EHOSTUNREACH: return 113;
+  case EALREADY: return 114;
+  case EINPROGRESS: return 115;
+  default: return host_errno > 0 && host_errno <= 34 ? host_errno : 5 /* EIO */;
   }
-  gm_w32(guest_errno_addr(), (uint32_t)e);
 }
+
+void guest_set_errno(int host_errno) { gm_w32(guest_errno_addr(), (uint32_t)linux_errno(host_errno)); }
 
 static void h_errno(cpu *c) { cpu_ret(c, guest_errno_addr()); }
 
 static void h_abort(cpu *c) { guest_fatal(c, "abort()"); }
+
+/* exit / _exit: the game gave up (LuaJIT's panic handler calls exit(1)).
+ * Stop it like abort rather than returning into code that can't go on. */
+static void h_exit(cpu *c) {
+  char why[32];
+  snprintf(why, sizeof why, "exit(%d)", (int32_t)cpu_arg(c, 0));
+  guest_fatal(c, why);
+}
 
 static void h_stack_chk_fail(cpu *c) { guest_fatal(c, "stack smashing detected"); }
 
@@ -112,6 +145,8 @@ const dynlib_impl reimpl_runtime[] = {
     {"__errno", h_errno},
     {"__gnu_Unwind_Find_exidx", h_unwind_find_exidx},
     {"__stack_chk_fail", h_stack_chk_fail},
+    {"_exit", h_exit},
     {"abort", h_abort},
+    {"exit", h_exit},
     {NULL, NULL},
 };

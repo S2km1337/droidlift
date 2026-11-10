@@ -26,6 +26,7 @@
 #define G_EINVAL 22
 #define G_EAGAIN 11
 #define G_EDEADLK 35
+#define G_ETIMEDOUT 110
 
 #define MUTEX_TYPE_SHIFT 14
 #define MUTEX_TYPE_MASK (3u << MUTEX_TYPE_SHIFT)
@@ -112,6 +113,7 @@ static uint32_t host_err(int e) {
   case EBUSY: return G_EBUSY;
   case EDEADLK: return G_EDEADLK;
   case EAGAIN: return G_EAGAIN;
+  case ETIMEDOUT: return G_ETIMEDOUT;
   default: return G_EINVAL;
   }
 }
@@ -156,6 +158,20 @@ static void h_mutex_unlock(cpu *c) {
   cpu_ret(c, o ? host_err(pthread_mutex_unlock(&o->mutex)) : G_EINVAL);
 }
 
+static void h_mutex_trylock(cpu *c) {
+  sync_obj *o = lookup(cpu_arg(c, 0), OBJ_MUTEX);
+  cpu_ret(c, o ? host_err(pthread_mutex_trylock(&o->mutex)) : G_EINVAL);
+}
+
+/* The attribute is one plain word: nothing to free. */
+static void h_mutexattr_destroy(cpu *c) { cpu_ret(c, 0); }
+
+/* A guest struct timespec (two 32-bit words) as a host one. */
+static struct timespec guest_timespec(uint32_t g) {
+  struct timespec ts = {(time_t)(int32_t)gm_r32(g), (long)(int32_t)gm_r32(g + 4)};
+  return ts;
+}
+
 /* --- condition variables --- */
 
 static void h_cond_init(cpu *c) {
@@ -173,6 +189,19 @@ static void h_cond_wait(cpu *c) {
   sync_obj *cv = lookup(cpu_arg(c, 0), OBJ_COND);
   sync_obj *m = lookup(cpu_arg(c, 1), OBJ_MUTEX);
   cpu_ret(c, cv && m ? host_err(pthread_cond_wait(&cv->cond, &m->mutex)) : G_EINVAL);
+}
+
+/* pthread_cond_timedwait(cond, mutex, abstime): abstime on CLOCK_REALTIME,
+ * bionic's default for a condition variable, as on the host. */
+static void h_cond_timedwait(cpu *c) {
+  sync_obj *cv = lookup(cpu_arg(c, 0), OBJ_COND);
+  sync_obj *m = lookup(cpu_arg(c, 1), OBJ_MUTEX);
+  if (!cv || !m || !cpu_arg(c, 2)) {
+    cpu_ret(c, G_EINVAL);
+    return;
+  }
+  struct timespec ts = guest_timespec(cpu_arg(c, 2));
+  cpu_ret(c, host_err(pthread_cond_timedwait(&cv->cond, &m->mutex, &ts)));
 }
 
 static void h_cond_signal(cpu *c) {
@@ -234,6 +263,24 @@ static void h_sem_wait(cpu *c) {
   o->count--;
   pthread_mutex_unlock(&o->mutex);
   cpu_ret(c, 0);
+}
+
+/* sem_timedwait(sem, abstime): abstime on CLOCK_REALTIME. */
+static void h_sem_timedwait(cpu *c) {
+  sync_obj *o = lookup(cpu_arg(c, 0), OBJ_SEM);
+  if (!o || !cpu_arg(c, 1)) {
+    sem_fail(c, G_EINVAL);
+    return;
+  }
+  struct timespec ts = guest_timespec(cpu_arg(c, 1));
+  int err = 0;
+  pthread_mutex_lock(&o->mutex);
+  while (o->count == 0 && err != ETIMEDOUT) err = pthread_cond_timedwait(&o->cond, &o->mutex, &ts);
+  int ok = o->count > 0;
+  if (ok) o->count--;
+  pthread_mutex_unlock(&o->mutex);
+  if (ok) cpu_ret(c, 0);
+  else sem_fail(c, G_ETIMEDOUT);
 }
 
 static void h_sem_trywait(cpu *c) {
@@ -350,5 +397,9 @@ const dynlib_impl reimpl_pthread[] = {
     {"sem_post", h_sem_post},
     {"sem_trywait", h_sem_trywait},
     {"sem_wait", h_sem_wait},
+    {"pthread_mutex_trylock", h_mutex_trylock},
+    {"pthread_mutexattr_destroy", h_mutexattr_destroy},
+    {"pthread_cond_timedwait", h_cond_timedwait},
+    {"sem_timedwait", h_sem_timedwait},
     {NULL, NULL},
 };

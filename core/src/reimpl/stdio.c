@@ -75,6 +75,25 @@ void stdio_set_data_root(const char *dir) {
 
 const char *stdio_data_root(void) { return data_root; }
 
+const char *stdio_guest_path(const char *in) {
+  /* A few rotating buffers per thread: rename normalises two paths at once. */
+  static __thread char bufs[4][PATH_MAX];
+  static __thread int next;
+  char *out = bufs[next++ & 3];
+  size_t n = 0;
+  if (in[0] != '/') out[n++] = '/'; /* relative to the working directory, "/" */
+  for (const char *p = in; *p && n < PATH_MAX - 1; p++) {
+    if (*p == '/' && n && out[n - 1] == '/') continue;
+    if (p[0] == '.' && p[1] == '/' && n && out[n - 1] == '/') {
+      p++; /* "./" */
+      continue;
+    }
+    out[n++] = *p;
+  }
+  out[n] = 0;
+  return out;
+}
+
 int stdio_path_allowed(const char *path) {
   size_t n = strlen(data_root);
   if (!n || strncmp(path, data_root, n) != 0 || (path[n] != '/' && path[n] != 0)) return 0;
@@ -199,6 +218,7 @@ static FILE *open_path(const char *path, const char *mode, char **target) {
   *target = NULL;
   int vfd = mode[0] == 'r' && !strchr(mode, '+') ? fileio_open_virtual(path) : -1;
   if (vfd >= 0) return fdopen(vfd, mode);
+  path = stdio_guest_path(path);
   if (!stdio_path_allowed(path)) {
     fprintf(stderr, "[stdio] fopen(\"%s\", \"%s\"): outside the data directory, ENOENT\n", path,
             mode);
@@ -356,6 +376,40 @@ static void h_puts(cpu *c) {
 static void h_fputc(cpu *c) {
   char ch = (char)cpu_arg(c, 0);
   cpu_ret(c, stdio_write(cpu_arg(c, 1), &ch, 1) < 0 ? G_EOF : (uint8_t)ch);
+}
+
+static void h_putchar(cpu *c) {
+  char ch = (char)cpu_arg(c, 0);
+  cpu_ret(c, stdio_write(stdio_stream(1), &ch, 1) < 0 ? G_EOF : (uint8_t)ch);
+}
+
+/* __swbuf(int c, FILE *f): old bionic's putc macro calls it when the guest
+ * FILE's write buffer is full. Ours have no guest-side buffer, so it is the
+ * whole write. */
+static void h_swbuf(cpu *c) { h_fputc(c); }
+
+/* tmpfile(): an unlinked file in the data directory. */
+static void h_tmpfile(cpu *c) {
+  char tmp[PATH_MAX];
+  snprintf(tmp, sizeof tmp, "%s/.tmp-XXXXXX", data_root);
+  int fd = mkstemp(tmp);
+  FILE *h = fd >= 0 ? fdopen(fd, "w+") : NULL;
+  if (!h) {
+    guest_set_errno(errno);
+    if (fd >= 0) close(fd);
+    cpu_ret(c, 0);
+    return;
+  }
+  unlink(tmp);
+  cpu_ret(c, wrap(h, "w+", NULL));
+}
+
+/* system(cmd): an app can't run shell commands here; -1 like a failed fork. */
+static void h_system(cpu *c) {
+  fprintf(stderr, "[stdio] system(\"%s\"): not supported\n",
+          cpu_arg(c, 0) ? (const char *)g2h(cpu_arg(c, 0)) : "(null)");
+  gm_w32(guest_errno_addr(), 38 /* ENOSYS */);
+  cpu_ret(c, cpu_arg(c, 0) ? (uint32_t)-1 : 0); /* system(NULL): no shell */
 }
 
 /* Reading calls: the host FILE of a guest file, or NULL for stdin (always at
@@ -649,5 +703,6 @@ const dynlib_impl reimpl_stdio[] = {
     {"fread", h_fread},   {"freopen", h_freopen}, {"fscanf", h_fscanf}, {"fseek", h_fseek},
     {"fseeko", h_fseek},  {"ftell", h_ftell},   {"ftello", h_ftell},  {"fwrite", h_fwrite},
     {"getc", h_getc},     {"putc", h_fputc},    {"puts", h_puts},     {"setvbuf", h_setvbuf},
-    {"sscanf", h_sscanf}, {"ungetc", h_ungetc}, {NULL, NULL},
+    {"sscanf", h_sscanf}, {"ungetc", h_ungetc}, {"putchar", h_putchar}, {"__swbuf", h_swbuf},
+    {"tmpfile", h_tmpfile}, {"system", h_system}, {NULL, NULL},
 };

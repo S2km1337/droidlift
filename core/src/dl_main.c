@@ -50,6 +50,7 @@
 #include "game_patches.h"
 #include "gfx.h"
 #include "guest_mem.h"
+#include "kuser.h"
 #include "input.h"
 #include "interp_selftest.h"
 #include "jni_selftest.h"
@@ -361,7 +362,7 @@ int dl_main(const dl_game *g, int argc, char **argv) {
   char asset_dir[1024];
   snprintf(asset_dir, sizeof(asset_dir), "%s/" APK_ASSET_DIR, work);
   android_asset_set_root(asset_dir);
-  if (gm_init() != 0 || dynlib_init() != 0 || jni_init() != 0) return 1;
+  if (gm_init() != 0 || kuser_init() != 0 || dynlib_init() != 0 || jni_init() != 0) return 1;
   if (g->jni_classes) jni_add_known_classes(g->jni_classes);
   if (g->init(data) != 0) return 1;
   stdio_set_data_root(data);

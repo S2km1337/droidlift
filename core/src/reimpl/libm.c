@@ -66,6 +66,23 @@ static void h_modf(cpu *c) {
 
 static void h_log10f(cpu *c) { fret(c, log10f(farg(c, 0))); }
 
+UNARY(exp2)
+
+#define UNARYF(name) \
+  static void h_##name(cpu *c) { fret(c, name(farg(c, 0))); }
+#define BINARYF(name) \
+  static void h_##name(cpu *c) { fret(c, name(farg(c, 0), farg(c, 1))); }
+
+UNARYF(acosf) UNARYF(asinf) UNARYF(cosf) UNARYF(expf) UNARYF(floorf) UNARYF(logf)
+UNARYF(sinf) UNARYF(sqrtf) UNARYF(tanf)
+BINARYF(atan2f) BINARYF(fmodf) BINARYF(powf)
+
+/* __isinf(double): 1 for +inf, -1 for -inf (bionic's isinf), 0 otherwise. */
+static void h___isinf(cpu *c) {
+  double d = darg(c, 0);
+  cpu_ret(c, isinf(d) ? (uint32_t)(d > 0 ? 1 : -1) : 0);
+}
+
 static void h_lrintf(cpu *c) { cpu_ret(c, (uint32_t)(int32_t)lrintf(farg(c, 0))); }
 
 static void h_isfinitef(cpu *c) { cpu_ret(c, isfinite(farg(c, 0)) ? 1 : 0); }
@@ -77,5 +94,9 @@ const dynlib_impl reimpl_libm[] = {
     {"ldexp", h_ldexp},           {"log", h_log},     {"log10", h_log10}, {"log10f", h_log10f},
     {"lrintf", h_lrintf},         {"modf", h_modf},   {"pow", h_pow},     {"rint", h_rint},
     {"sin", h_sin},               {"sinh", h_sinh},   {"sqrt", h_sqrt},   {"tan", h_tan},
-    {"tanh", h_tanh},             {NULL, NULL},
+    {"tanh", h_tanh},             {"exp2", h_exp2},   {"acosf", h_acosf}, {"asinf", h_asinf},
+    {"cosf", h_cosf},             {"expf", h_expf},   {"floorf", h_floorf}, {"logf", h_logf},
+    {"sinf", h_sinf},             {"sqrtf", h_sqrtf}, {"tanf", h_tanf},   {"atan2f", h_atan2f},
+    {"fmodf", h_fmodf},           {"powf", h_powf},   {"__isinf", h___isinf},
+    {NULL, NULL},
 };

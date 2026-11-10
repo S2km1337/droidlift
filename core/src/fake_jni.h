@@ -36,7 +36,10 @@ struct cpu;
 typedef struct jni_call {
   uint32_t self;  /* jobject for instance methods and constructors, jclass for static */
   int nargs;
-  uint64_t args[16];
+  uint64_t args[24]; /* cocos2d-x's createTextBitmapShadowStroke takes 19 */
+  /* The cpu that made the call, for implementations that call back into the
+   * game (cpu_callback), as Java code calls a native method. */
+  struct cpu *cpu;
 } jni_call;
 
 /* Returns the method's result (same encoding as the arguments; ignored for void). */
@@ -70,6 +73,13 @@ uint32_t jni_new_instance(const char *cls); /* 0 if the class is unknown */
 uint32_t jni_find_class(const char *cls);   /* the jclass, as FindClass returns it */
 uint32_t jni_new_object_array(const char *elem_cls, uint32_t len);
 int jni_set_object_array_element(uint32_t array, uint32_t index, uint32_t value);
+/* A new zeroed primitive array of elem ('Z', 'B', 'C', 'S', 'I', 'J', 'F' or
+ * 'D') and len elements, as New<Type>Array makes. */
+uint32_t jni_new_prim_array(char elem, uint32_t len);
+/* Frees a primitive array's data once no native code holds it (for host code
+ * that makes big temporary arrays, such as text bitmaps); the handle stays,
+ * as an empty array. */
+void jni_free_prim_array(uint32_t array);
 /* Primitive arrays: guest address and length of the data, or 0 if not one. */
 uint32_t jni_array_data(uint32_t array, uint32_t *len);
 

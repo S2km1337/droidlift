@@ -48,6 +48,8 @@ void android_asset_set_root(const char *dir) {
   snprintf(asset_root, sizeof(asset_root), "%s", dir);
 }
 
+const char *android_asset_root(void) { return asset_root; }
+
 static int asset_verbose = -1;
 
 void android_asset_set_verbose(int on) { asset_verbose = on; }

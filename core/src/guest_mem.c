@@ -19,6 +19,8 @@ uint8_t *g_mem;
 static uint64_t guest_space = FULL_SPACE;
 
 static uint64_t next_free = GUEST_ALLOC_START;
+/* gm_alloc stays below this: the lowest gm_map_fixed region, less a guard. */
+static uint64_t alloc_limit = FULL_SPACE;
 static struct {
   uint32_t start, end;
   const char *tag;
@@ -64,6 +66,7 @@ void gm_free(void) {
   if (g_mem) munmap(g_mem, guest_space);
   g_mem = NULL;
   next_free = GUEST_ALLOC_START;
+  alloc_limit = FULL_SPACE;
   n_regions = 0;
 }
 
@@ -73,7 +76,7 @@ uint32_t gm_alloc(uint32_t size, uint32_t align, const char *tag) {
   if (align < HOST_PAGE) align = HOST_PAGE;
   uint64_t start = (next_free + align - 1) & ~(uint64_t)(align - 1);
   uint64_t len = ((uint64_t)size + HOST_PAGE - 1) & ~(uint64_t)(HOST_PAGE - 1);
-  if (len == 0 || start + len > guest_space || n_regions == MAX_REGIONS) {
+  if (len == 0 || start + len > guest_space || start + len > alloc_limit || n_regions == MAX_REGIONS) {
     fprintf(stderr, "gm_alloc: cannot place %s (0x%x bytes)\n", tag, size);
     goto out;
   }
@@ -88,6 +91,30 @@ uint32_t gm_alloc(uint32_t size, uint32_t align, const char *tag) {
   /* One guard page between regions. */
   next_free = start + len + HOST_PAGE;
   r = (uint32_t)start;
+out:
+  pthread_mutex_unlock(&alloc_lock);
+  return r;
+}
+
+uint32_t gm_map_fixed(uint32_t addr, uint32_t size, const char *tag) {
+  pthread_mutex_lock(&alloc_lock);
+  uint32_t r = 0;
+  uint64_t start = addr & ~(uint64_t)(HOST_PAGE - 1);
+  uint64_t len = (((uint64_t)addr + size + HOST_PAGE - 1) & ~(uint64_t)(HOST_PAGE - 1)) - start;
+  if (size == 0 || start + len > guest_space || start < next_free || n_regions == MAX_REGIONS) {
+    fprintf(stderr, "gm_map_fixed: cannot place %s at 0x%08x\n", tag, addr);
+    goto out;
+  }
+  if (mprotect(g_mem + start, len, PROT_READ | PROT_WRITE) != 0) {
+    perror("gm_map_fixed: mprotect");
+    goto out;
+  }
+  regions[n_regions].start = (uint32_t)start;
+  regions[n_regions].end = (uint32_t)(start + len - 1);
+  regions[n_regions].tag = tag;
+  __atomic_store_n(&n_regions, n_regions + 1, __ATOMIC_RELEASE);
+  if (start - HOST_PAGE < alloc_limit) alloc_limit = start - HOST_PAGE;
+  r = addr;
 out:
   pthread_mutex_unlock(&alloc_lock);
   return r;

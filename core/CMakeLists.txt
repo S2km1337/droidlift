@@ -27,6 +27,7 @@ add_library(droidlift_core STATIC
   src/apk.c
   src/dynlib.c
   src/guest_mem.c
+  src/kuser.c
   src/so_util.c
   src/cpu.c
   src/cpu_selftest.c
@@ -62,7 +63,7 @@ target_include_directories(droidlift_core PUBLIC src)
 # for iOS, the static build of scripts/fetch-ios-deps.sh.
 find_package(SDL3 REQUIRED CONFIG)
 target_link_libraries(droidlift_core PUBLIC z SDL3::SDL3 dl_interp_rc)
-target_compile_definitions(droidlift_core PUBLIC DL_DEFAULT_CPU="${DL_DEFAULT_CPU}")
+target_compile_definitions(droidlift_core PUBLIC DL_DEFAULT_CPU="${DL_DEFAULT_CPU}" APK_LIB_DIR="${DL_APK_LIB_DIR}")
 if (DL_WITH_DYNARMIC)
   target_sources(droidlift_core PRIVATE src/cpu_dynarmic.cpp)
   target_link_libraries(droidlift_core PUBLIC dynarmic)
